@@ -28,6 +28,7 @@ def getStationList():
         for pm in placemarkList:
             name = pm.findtext('name').strip()
             coordsList = pm.findtext('Point/coordinates').strip().split(",")
+            # Longitude and latitude need leading 0's if start with "-." or "."
             lng = coordsList[0].replace("-.", "-0.")
             lat = coordsList[1].replace("-.", "-0.")
             if coordsList[0].startswith("."):
@@ -43,6 +44,7 @@ def getStationList():
 
 def getCrimeStats(stationList):
 
+    crimeList = list()
     server = "policeapi2.rkh.co.uk"
     base_url = "/api/locate-neighbourhood?q="
 
@@ -54,9 +56,9 @@ def getCrimeStats(stationList):
         
         # Find the neighbourhood team code
         conn.request("GET", base_url + lat + "," + lng)
-        print("Request: " + server + base_url + lat + "," + lng + " successfully sent")
+        #print("Request: " + server + base_url + lat + "," + lng + " successfully sent")
         r1 = conn.getresponse()
-        print(r1.status, r1.reason)
+        #print(r1.status, r1.reason)
         if r1.reason == "OK":
             data1 = r1.read()
             strData = data1.decode("utf-8")
@@ -67,38 +69,48 @@ def getCrimeStats(stationList):
             #    "neighbourhood": "00BKX6"
             # }
             forceDict = ast.literal_eval(strData)
-            print(forceDict)
+            #print(forceDict)
             conn.request("GET", "/api/" + forceDict['force'] + "/" + forceDict['neighbourhood'] + "/crime")
             r1 = conn.getresponse()
             if r1.reason == "OK":
-                print(r1.status, r1.reason)
+                #print(r1.status, r1.reason)
                 data1 = r1.read()
                 strData = data1.decode("utf-8")
                 jdata = json.loads(strData)
-                print(jdata)
 
-
-                #crimeDict = ast.literal_eval(strData)
-                #print(crimeDict)
+                # Wind through the dict to get to summary of total crimes
+                topNode = jdata['crimes']
+                crimeDate = topNode['2012-08']
+                allCrime = crimeDate['all-crime']
+                totalCrimes = allCrime['total_crimes']
+                #print("Station: ", stationname)
+                #print("Total crimes: ", totalCrimes)
+                crimeList.append((stationname, totalCrimes))
                 
             else:
                 print("ERROR: received: ", r1.status, r1.reason)
         else:
             print("ERROR: received: ", r1.status, r1.reason)
 
-        print("Station: ", stationname)
-        print(strData)
+        # print(strData)
 
         # And close the connection
         conn.close()
 
+    return crimeList    
 
 
-
-
+#
+# Main processing logic
+#
+#
 
 print("Get station list")
 stationList = getStationList()
-print ("Returned from station list " + str(stationList))
+print ("Returned from station list")
 print("Getting crime stats for all stations")
-getCrimeStats(stationList)
+crimeList = getCrimeStats(stationList)
+
+for place in sorted(crimeList, key=lambda x: x[1]):
+    print(place)
+
